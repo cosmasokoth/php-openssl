@@ -1,0 +1,149 @@
+
+
+$privateKey = openssl_pkey_new(array(
+
+    'private_key_bits' => 2048,      // Size of Key.
+
+    'private_key_type' => OPENSSL_KEYTYPE_RSA,
+
+));
+
+// Save the private key to private.key file. Never share this file with anyone.
+
+openssl_pkey_export_to_file($privateKey, 'private.key');
+
+ 
+
+// Generate the public key for the private key
+
+$a_key = openssl_pkey_get_details($privateKey);
+
+// Save the public key in public.key file. Send this file to anyone who want to send you the encrypted data.
+
+file_put_contents('public.key', $a_key['key']);
+
+ 
+
+// Free the private Key.
+
+openssl_free_key($privateKey);
+
+// Data to be sent
+
+$plaintext = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean eleifend vestibulum nunc sit amet mattis. Nulla at volutpat nulla. Pellentesque sodales vel ligula quis consequat. Suspendisse dapibus dolor nec viverra venenatis. Pellentesque blandit vehicula eleifend. Duis eget fermentum velit. Vivamus varius ut dui vel malesuada. Ut adipiscing est non magna posuere ullamcorper. Proin pretium nibh nec elementum tincidunt. Vestibulum leo urna, porttitor et aliquet id, ornare at nibh. Maecenas placerat justo nunc, varius condimentum diam fringilla sed. Donec auctor tellus vitae justo venenatis, sit amet vulputate felis accumsan. Aenean aliquet bibendum magna, ac adipiscing orci venenatis vitae.';
+
+ 
+
+echo 'Plain text: ' . $plaintext;
+
+// Compress the data to be sent
+
+$plaintext = gzcompress($plaintext);
+
+ 
+
+// Get the public Key of the recipient
+
+$publicKey = openssl_pkey_get_public('file:///path/to/public.key');
+
+$a_key = openssl_pkey_get_details($publicKey);
+
+ 
+
+// Encrypt the data in small chunks and then combine and send it.
+
+$chunkSize = ceil($a_key['bits'] / 8) - 11;
+
+$output = '';
+
+ 
+
+while ($plaintext)
+
+{
+
+    $chunk = substr($plaintext, 0, $chunkSize);
+
+    $plaintext = substr($plaintext, $chunkSize);
+
+    $encrypted = '';
+
+    if (!openssl_public_encrypt($chunk, $encrypted, $publicKey))
+
+    {
+
+        die('Failed to encrypt data');
+
+    }
+
+    $output .= $encrypted;
+
+}
+
+openssl_free_key($publicKey);
+
+ 
+
+// This is the final encrypted data to be sent to the recipient
+
+$encrypted = $output;
+
+
+// Get the private Key
+
+if (!$privateKey = openssl_pkey_get_private('file:///path/to/private.key'))
+
+{
+
+    die('Private Key failed');
+
+}
+
+$a_key = openssl_pkey_get_details($privateKey);
+
+ 
+
+// Decrypt the data in the small chunks
+
+$chunkSize = ceil($a_key['bits'] / 8);
+
+$output = '';
+
+ 
+
+while ($encrypted)
+
+{
+
+    $chunk = substr($encrypted, 0, $chunkSize);
+
+    $encrypted = substr($encrypted, $chunkSize);
+
+    $decrypted = '';
+
+    if (!openssl_private_decrypt($chunk, $decrypted, $privateKey))
+
+    {
+
+        die('Failed to decrypt data');
+
+    }
+
+    $output .= $decrypted;
+
+}
+
+openssl_free_key($privateKey);
+
+ 
+
+// Uncompress the unencrypted data.
+
+$output = gzuncompress($output);
+
+ 
+
+echo '<br /><br /> Unencrypted Data: ' . $output;
+
+ 
+
